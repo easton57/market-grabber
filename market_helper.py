@@ -9,6 +9,7 @@ import keyring
 import pandas as pd
 import yfinance as yf
 import statistics as stats
+from getpass import getpass
 from datetime import datetime, timedelta
 from postgres_helper import PsSQLHelper as pgh
 
@@ -55,7 +56,15 @@ def download(tick_name, start_date=f"{(datetime.now()  - timedelta(days=6)).strf
 
     # Write to database
     keys = list(data.index)
-    db = pgh('market_saver_user', keyring.get_password('market-saver', 'market_saver_user'))
+
+    # Attempt to get the password and have it set if empty
+    password = keyring.get_password('market_saver', 'market_saver_user')
+
+    if password is None:
+        password = getpass("Please enter your database password")
+        keyring.set_password('market_saver', 'market_saver_user', password)
+
+    db = pgh('market_saver_user', password)
 
     # For futures remove the =F and insert _F for db name compatibility
     if '=F' in tick_name:
