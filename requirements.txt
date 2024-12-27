@@ -1,0 +1,4 @@
+keyring==25.6.0
+pandas==2.2.3
+psycopg2==2.9.10
+yfinance==0.2.51
