@@ -3,9 +3,7 @@ Market helper using yfinance
 Will do some math to fill in some of the additional columns in the database
 """
 
-import math
 import logging
-import keyring
 import pandas as pd
 import yfinance as yf
 import statistics as stats
@@ -56,15 +54,7 @@ def download(tick_name, start_date=f"{(datetime.now()  - timedelta(days=6)).strf
 
     # Write to database
     keys = list(data.index)
-
-    # Attempt to get the password and have it set if empty
-    password = keyring.get_password('market_saver', 'market_saver_user')
-
-    if password is None:
-        password = getpass("Please enter your database password")
-        keyring.set_password('market_saver', 'market_saver_user', password)
-
-    db = pgh('market_saver_user', password)
+    db = pgh()
 
     # For futures remove the =F and insert _F for db name compatibility
     if '=F' in tick_name:
@@ -81,7 +71,7 @@ def insert_csv(tick_name, interval, file_name) -> bool:
 
     # Write to database
     keys = list(data.index)
-    db = pgh('market_saver_user', keyring.get_password('market-saver', 'market_saver_user'))
+    db = pgh()
 
     # For futures remove the =F and insert _F for db name compatibility
     if '=F' in tick_name:
