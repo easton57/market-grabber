@@ -1,6 +1,5 @@
 """
 Market helper using yfinance
-Will do some math to fill in some of the additional columns in the database
 """
 
 import logging
@@ -13,7 +12,7 @@ from postgres_helper import PsSQLHelper as pgh
 
 def download(tick_name, start_date=f"{(datetime.now()  - timedelta(days=6)).strftime('%Y-%m-%d')}",
              end_date=f"{datetime.now().strftime('%Y-%m-%d')}", interval="5m", today=False, full=False) -> bool:
-    logging.basicConfig(filename=f"logs/download_{tick_name}_{datetime.today().strftime('%Y-%m-%d')}.log", filemode='w',
+    logging.basicConfig(filename=f"logs/download_{tick_name}_{datetime.today().strftime('%Y-%m-%d')}.log", filemode='a',
                         level=logging.DEBUG, force=True, format='[%(asctime)s] %(name)s %(levelname)s - %(message)s')
 
     """ Will download the ticker data, do some calculations and add it to the database """
