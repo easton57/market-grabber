@@ -182,6 +182,7 @@ class PsSQLHelper:
             # Execute the query
             self.cur.execute(query)
             self.conn.commit()
+            logging.info(f"Write '{query}' to database")
             return True
         except Exception as e:
             self.conn.rollback()
