@@ -7,7 +7,6 @@ import logging
 import pandas as pd
 import yfinance as yf
 import statistics as stats
-from getpass import getpass
 from datetime import datetime, timedelta
 from postgres_helper import PsSQLHelper as pgh
 

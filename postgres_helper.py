@@ -5,35 +5,76 @@ Planned to be used in: Market Saver SL
 """
 
 import logging
-import psycopg2
-import psycopg2.errors
+import keyring
+import configparser as cp
+import psycopg
+import psycopg.errors
 import datetime as dt
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+
+from getpass import getpass
 
 
 class PsSQLHelper:
-    def __init__(self, user, password, host='192.168.73.233', port=5432):
+    def __init__(self):
         """ Initializer for PsSQLHelper class """
+        # read from conf file, prompt if they don't exist. user, password (set in keyring), host, port
+        config = cp.ConfigParser()
+        config.read('conf/postgres_helper.conf')
+
+        try:
+            # Read the config
+            user = config["connection"]["user"]
+            password_set = config["connection"]["password_set"]
+            host = config["connection"]["host"]
+            port = int(config["connection"]["port"])
+
+        except KeyError:
+            user = input("Please enter your PostgreSQL username: ")
+            host = input("Enter your PostgreSQL hostname: ")
+            port = '5432'
+            password_set = 'False'
+
+            config["connection"] = {
+                "user": user,
+                "password_set": password_set,
+                "host": host,
+                "port": port
+            }
+
+        # Attempt to get the password and have it set if empty
+        password = keyring.get_password('market_saver', user)
+
+        if password is None or password_set == "False":
+            password = getpass(f"Please enter your database password for {user}: ")
+            keyring.set_password('market_saver', user, password)
+            config["connection"]["password_set"] = 'True'
+
+            # write the config
+            with open('conf/postgres_helper.conf', 'w') as f:
+                config.write(f)
+
+
         if user is None or password is None:
             logging.info("Username or password is empty! Those are required fields!")
             return
 
         # Attempt to connect to the database
         try:
-            self.conn = psycopg2.connect(
+            self.conn = psycopg.connect(
                 host=host,
-                dbname="market_saver_db_rl",
+                dbname="market_saver_db",
                 user=user,
                 password=password,
-                port=port)
+                port=port,
+                autocommit=True)
 
             logging.info("Connected successfully!")
-        except psycopg2.OperationalError:
+        except psycopg.OperationalError:  # TODO: Check for and declare an error if the password is incorrect
             try:
                 logging.warning("Database doesn't exist, attempting to create database before continuing...")
 
                 # try to create the database
-                conn = psycopg2.connect(
+                conn = psycopg.connect(
                     host=host,
                     dbname="postgres",
                     user=user,
@@ -41,15 +82,14 @@ class PsSQLHelper:
                     port=port)
 
                 # Create cursor and send the query
-                conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
                 cur = conn.cursor()
-                cur.execute("CREATE DATABASE market_saver_db_rl;")
+                cur.execute("CREATE DATABASE market_saver_db_sl;")
                 conn.close()
 
                 # create global connection
-                self.conn = psycopg2.connect(
+                self.conn = psycopg.connect(
                     host=host,
-                    dbname="market_saver_db_rl",
+                    dbname="market_saver_db_sl",
                     user=user,
                     password=password,
                     port=port)
@@ -59,7 +99,7 @@ class PsSQLHelper:
             except Exception as e:
                 logging.error(f"Could not create database! Manually create market_saver_db and try again.\n {e}")
                 return
-        except psycopg2.DatabaseError:
+        except psycopg.DatabaseError:
             logging.error(f"Failed to connect: Unable to find database at address: {host}")
             return
 
@@ -69,7 +109,7 @@ class PsSQLHelper:
         # Create ticker table if it doesn't exist
         try:
             self.cur.execute("SELECT * FROM ticker")
-        except psycopg2.errors.UndefinedTable:
+        except psycopg.errors.UndefinedTable:
             self.conn.rollback()
             self.create_ticker_table()
 
@@ -101,7 +141,8 @@ class PsSQLHelper:
                  f"high_val FLOAT8,"
                  f"low_val FLOAT8,"
                  f"close_val FLOAT8,"
-                 f"volume INT"
+                 f"volume INT,"
+                 f"action TEXT DEFAULT 'hold'"
                  f"); ")
 
         # Send the query and return status of execution
@@ -120,7 +161,7 @@ class PsSQLHelper:
         try:
             self.cur.execute(f"SELECT * FROM {tick_name}")
             logging.info("Tick name table exists")
-        except psycopg2.errors.UndefinedTable:
+        except psycopg.errors.UndefinedTable:
             self.conn.rollback()
             return False
 
@@ -128,7 +169,7 @@ class PsSQLHelper:
         try:
             self.cur.execute(f"SELECT * FROM {tick_name}_{time_span}")
             logging.info("Tick time span table exists")
-        except psycopg2.errors.UndefinedTable:
+        except psycopg.errors.UndefinedTable:
             self.conn.rollback()
             return False
 
@@ -217,11 +258,11 @@ class PsSQLHelper:
             query = (f"INSERT INTO {tick_name}_{time_span}(tick_time, open_val, high_val, low_val, close_val, volume) "
                      f"Values("
                      f"'{keys[i]}', "
-                     f"{data.loc[keys[i], 'Open']}, "
-                     f"{data.loc[keys[i], 'High']}, "
-                     f"{data.loc[keys[i], 'Low']}, "
-                     f"{data.loc[keys[i], 'Close']}, "
-                     f"{data.loc[keys[i], 'Volume']});")
+                     f"{float(data.loc[keys[i], 'Open'])}, "
+                     f"{float(data.loc[keys[i], 'High'])}, "
+                     f"{float(data.loc[keys[i], 'Low'])}, "
+                     f"{float(data.loc[keys[i], 'Close'])}, "
+                     f"{int(data.loc[keys[i], 'Volume'])});")
 
             self.execute_query(query)
 
